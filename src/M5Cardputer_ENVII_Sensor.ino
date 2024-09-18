@@ -1,7 +1,14 @@
-// M5Stack_Cardputer_ENVII_Sensor.ino
-//
-/* Example downloaded from: https://github.com/adafruit/Adafruit_BMP280_Library/blob/master/examples/bmp280_sensortest/bmp280_sensortest.ino */
-/* @PaulskPt adapted this sketch for the M5Stack Cardputer (with M5 StampS3) */
+/* 
+* M5Stack_Cardputer_ENVII_Sensor.ino
+*
+* Example downloaded from: [BMP200 Library](https://github.com/adafruit/Adafruit_BMP280_Library/blob/master/examples/bmp280_sensortest/bmp280_sensortest.ino) 
+* @PaulskPt adapted this sketch for the M5Stack Cardputer with M5 StampS3, SKU: K132.
+* From BMP280.h:
+* #define BMP280_I2C_ADDR 0x76 (= 118 dec, 0x7F = 127)
+* From SH3X.h:
+* #define SHT3X_I2C_ADDR 0x44 (= 68 dec)
+*
+*/
 
 #include <M5Cardputer.h>
 #include <M5UnitENV.h>
@@ -23,6 +30,7 @@ unsigned int colour = 0;
 int hori[] = {0, 80, 120, 200};
 int vert[] = {20, 40, 60, 80, 100, 120};
 String TITLE =  "ENVII TEST";
+bool use_serial = true;
 
 void disp_title(void)
 {
@@ -48,14 +56,13 @@ void disp_frame()
 
 void msg_at_bottom(char* msg) {
   int cur_h = 10;
-  int cur_v = 10;
   if (strlen(msg) > 0) {
     Serial.println(msg);
     M5Cardputer.Display.setTextSize(std_text_size);
-    M5Cardputer.Display.setCursor(cur_h, cur_v + 200);
+    M5Cardputer.Display.setCursor(cur_h, dh-10);
     M5Cardputer.Display.print(msg);
     delay(5000);
-    M5Cardputer.Display.fillRect(cur_h, cur_v + 200, dw-5, 8, BLACK); //erase the LoRa init successful message
+    M5Cardputer.Display.fillRect(cur_h, dh-10, dw-5, 8, BLACK); //erase the LoRa init successful message
   }
 }
 
@@ -77,22 +84,30 @@ void setup() {
   M5Cardputer.Display.setTextDatum(middle_center);
   M5Cardputer.Display.setTextPadding(M5Cardputer.Display.width() - 50);
  
+  int trycnt = 0;
+  int trycnt_max = 500;
+
   Serial.begin(115200);
-  while ( !Serial ) delay(100);   // wait for native usb
-  
+
   Wire.begin(sda, scl);
 
   if (!sht3x.begin(&Wire, SHT3X_I2C_ADDR, sda, scl, 400000U)) {
-      Serial.println("Couldn't find SHT3X");
-      while (1) delay(1);
+    char txt3[] = "Couldn't find SHT3X";
+    if (!use_serial)
+      msg_at_bottom(txt3);
+    else
+      Serial.println(txt3);
   }
   else {
     use_sht = true;
   }
 
   if (!bmp.begin(&Wire, BMP280_I2C_ADDR, sda, scl, 400000U)) {
-      Serial.println("Couldn't find BMP280");
-      while (1) delay(1);
+    char txt4[] = "Couldn't find BMP280";
+    if (!use_serial)
+      msg_at_bottom(txt4);
+    else
+      Serial.println(txt4);
   }
   else {
     use_bmp = true;
@@ -109,7 +124,8 @@ void setup() {
 
   String nl = "\n\n";
   String s1 = nl + TITLE; // title;
-  Serial.println(s1);
+  if (use_serial)
+    Serial.println(s1);
 
   disp_title();
 
@@ -119,7 +135,8 @@ void setup() {
     msg_at_bottom("Not using BMP280)");
 }
 
-void loop() {
+void loop() 
+{
   char sht[]  = "-------- SHT3X  --------";
   char bmp2[] = "-------- BMP280 --------";
   char tmp[]  = "Temperature:   ";
@@ -130,6 +147,7 @@ void loop() {
   char mb[]   = " mb"; // is same as hPa or hectoPascal;
   char alt[]  = "Approx alt: ";
   char altm[] = " m";
+  int loopnr = 1;
 
   disp_frame();
 
@@ -138,16 +156,21 @@ void loop() {
     M5Cardputer.Display.fillRect(hori[2], vert[1]-8, dw-5, dh-5, BLACK);  // wipe out the variable values
     
     if (use_sht && sht3x.update()) {
-      Serial.println("----------SHT3X ----------");
-      Serial.print(tmp);
-      Serial.print(F(" "));
-      Serial.print(sht3x.cTemp);
-      Serial.println(tmpc);
-      Serial.print(hum);
-      Serial.print(F(" "));
-      Serial.print(sht3x.humidity);
-      Serial.println(humpct);
-      Serial.println("--------------------------\r\n");
+      if (use_serial)
+      {
+        Serial.print("Loop nr: ");
+        Serial.println(loopnr);
+        Serial.println("----------SHT3X ----------");
+        Serial.print(tmp);
+        Serial.print(F(" "));
+        Serial.print(sht3x.cTemp);
+        Serial.println(tmpc);
+        Serial.print(hum);
+        Serial.print(F(" "));
+        Serial.print(sht3x.humidity);
+        Serial.println(humpct);
+        Serial.println("--------------------------\r\n");
+      }
 
       M5Cardputer.Display.setCursor(hori[2], vert[1]); 
       M5Cardputer.Display.printf("%6.2f", sht3x.cTemp);
@@ -159,21 +182,24 @@ void loop() {
     }
 
     if (use_bmp && bmp.update()) {
-      Serial.println("----------BMP280----------");
-      Serial.print(F(tmp));
-      Serial.print(F(" "));
-      Serial.print(bmp.cTemp);
-      Serial.println(tmpc);
+      if (use_serial)
+      {
+        Serial.println("----------BMP280----------");
+        Serial.print(F(tmp));
+        Serial.print(F(" "));
+        Serial.print(bmp.cTemp);
+        Serial.println(tmpc);
 
-      Serial.print(F(hpa));
-      Serial.print(bmp.pressure/100);
-      Serial.println(mb);
+        Serial.print(F(hpa));
+        Serial.print(bmp.pressure/100);
+        Serial.println(mb);
 
-      Serial.print(F(alt));
-      Serial.print(F("    "));
-      Serial.print(bmp.altitude);
-      Serial.println(altm);
-      Serial.println("--------------------------\r\n");
+        Serial.print(F(alt));
+        Serial.print(F("    "));
+        Serial.print(bmp.altitude);
+        Serial.println(altm);
+        Serial.println("--------------------------\r\n");
+      }
       
       M5Cardputer.Display.setCursor(hori[2], vert[3]);
       M5Cardputer.Display.printf("%6.2f",bmp.cTemp);
@@ -188,5 +214,8 @@ void loop() {
       M5Cardputer.Display.println(altm);
     }
     delay(5000);
+    loopnr++;
+    if (loopnr > 1000)
+      loopnr = 1;
   }
 }
